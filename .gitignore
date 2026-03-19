@@ -1,0 +1,42 @@
+# Documentación personal (no commitear)
+ANSIBLE_GUIDE.md
+notas.txt
+CLAUDE.md
+
+# Inventario con IPs reales y usuarios
+inventory/hosts.ini
+
+# Variables con datos sensibles
+group_vars/all.yml
+
+# Claves SSH y certificados
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+id_ecdsa
+*.pub
+
+# Ficheros de vault de Ansible
+*.vault
+vault_pass.txt
+.vault_pass
+.vault_password
+
+# Logs y temporales de Ansible
+*.retry
+*.log
+
+# Variables de entorno con secrets
+.env
+*.env
+
+# Ficheros de configuración local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db

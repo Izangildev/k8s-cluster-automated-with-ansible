@@ -1,0 +1,92 @@
+---
+- name: Check if cluster is already initialized
+  stat:
+    path: /etc/kubernetes/admin.conf
+  register: kubeadm_init_done
+
+- name: Initialize Kubernetes control plane
+  command: kubeadm init --pod-network-cidr={{ pod_network_cidr }}
+  when: not kubeadm_init_done.stat.exists
+
+- name: Create .kube directory for ansible user
+  file:
+    path: "{{ ansible_user_dir }}/.kube"
+    state: directory
+    mode: '0755'
+    owner: "{{ ansible_user }}"
+
+- name: Copy admin.conf to ansible user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "{{ ansible_user_dir }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    mode: '0600'
+
+- name: Create /root/.kube directory
+  file:
+    path: /root/.kube
+    state: directory
+    mode: '0700'
+
+- name: Copy admin.conf to root's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: true
+    mode: '0600'
+
+- name: Download Calico tigera-operator manifest
+  get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/v{{ calico_version }}/manifests/tigera-operator.yaml"
+    dest: /tmp/tigera-operator.yaml
+    mode: '0644'
+
+- name: Download Calico custom-resources manifest
+  get_url:
+    url: "https://raw.githubusercontent.com/projectcalico/calico/v{{ calico_version }}/manifests/custom-resources.yaml"
+    dest: /tmp/custom-resources.yaml
+    mode: '0644'
+
+- name: Update pod CIDR in Calico custom-resources
+  replace:
+    path: /tmp/custom-resources.yaml
+    regexp: 'cidr: \S+'
+    replace: "cidr: {{ pod_network_cidr }}"
+
+- name: Apply Calico tigera-operator
+  command: kubectl create -f /tmp/tigera-operator.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: tigera_result
+  failed_when: tigera_result.rc != 0 and 'already exists' not in tigera_result.stderr
+  changed_when: tigera_result.rc == 0
+
+- name: Apply Calico custom resources
+  command: kubectl create -f /tmp/custom-resources.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: calico_result
+  failed_when: calico_result.rc != 0 and 'already exists' not in calico_result.stderr
+  changed_when: calico_result.rc == 0
+
+- name: Wait for Calico to become available
+  command: >
+    kubectl get tigerastatus calico
+    -o jsonpath='{.status.conditions[?(@.type=="Available")].status}'
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  register: calico_status
+  until: calico_status.stdout == "True"
+  retries: 30
+  delay: 20
+  changed_when: false
+
+- name: Generate worker node join command
+  command: kubeadm token create --print-join-command
+  register: join_command
+  changed_when: false
+
+- name: Share join command with workers via hostvars
+  set_fact:
+    kubeadm_join_command: "{{ join_command.stdout }}"

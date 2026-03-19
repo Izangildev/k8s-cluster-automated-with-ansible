@@ -1,0 +1,92 @@
+---
+- name: Download containerd
+  get_url:
+    url: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    mode: '0644'
+
+- name: Extract containerd to /usr/local
+  unarchive:
+    src: "/tmp/containerd-{{ containerd_version }}-linux-amd64.tar.gz"
+    dest: /usr/local/
+    remote_src: true
+
+- name: Create systemd directory for containerd service
+  file:
+    path: /usr/local/lib/systemd/system
+    state: directory
+    mode: '0755'
+
+- name: Download containerd systemd service file
+  get_url:
+    url: https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
+    dest: /usr/local/lib/systemd/system/containerd.service
+    mode: '0644'
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: true
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: Download runc
+  get_url:
+    url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.amd64"
+    dest: /tmp/runc.amd64
+    mode: '0755'
+
+- name: Install runc
+  copy:
+    src: /tmp/runc.amd64
+    dest: /usr/local/sbin/runc
+    mode: '0755'
+    remote_src: true
+
+- name: Download CNI plugins
+  get_url:
+    url: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-amd64-v{{ cni_plugins_version }}.tgz"
+    dest: "/tmp/cni-plugins-linux-amd64-v{{ cni_plugins_version }}.tgz"
+    mode: '0644'
+
+- name: Create CNI plugins directory
+  file:
+    path: /opt/cni/bin
+    state: directory
+    mode: '0755'
+
+- name: Extract CNI plugins
+  unarchive:
+    src: "/tmp/cni-plugins-linux-amd64-v{{ cni_plugins_version }}.tgz"
+    dest: /opt/cni/bin
+    remote_src: true
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: Generate default containerd config
+  shell: containerd config default > /etc/containerd/config.toml
+  args:
+    creates: /etc/containerd/config.toml
+
+- name: Enable SystemdCgroup in containerd config
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: '(\s*SystemdCgroup\s*=\s*)false'
+    replace: '\1true'
+  notify: restart containerd
+
+- name: Flush handlers
+  meta: flush_handlers
+
+- name: Verify containerd is active
+  systemd:
+    name: containerd
+  register: containerd_status
+  failed_when: containerd_status.status.ActiveState != "active"

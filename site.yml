@@ -1,0 +1,20 @@
+---
+- name: Common setup (all nodes)
+  hosts: all
+  become: true
+  roles:
+    - common
+    - containerd
+    - kubernetes
+
+- name: Initialize control plane
+  hosts: control_plane
+  become: true
+  roles:
+    - control_plane
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  roles:
+    - worker
