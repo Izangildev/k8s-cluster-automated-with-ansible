@@ -1,0 +1,13 @@
+---
+# Component versions
+kubernetes_version: "1.33"
+containerd_version: "2.1.0"
+runc_version: "1.3.0"
+cni_plugins_version: "1.7.1"
+calico_version: "3.30.0"
+
+# Network
+pod_network_cidr: "172.16.0.0/16"
+
+# Python interpreter
+ansible_python_interpreter: /usr/bin/python3

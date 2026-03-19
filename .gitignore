@@ -3,12 +3,6 @@ ANSIBLE_GUIDE.md
 notas.txt
 CLAUDE.md
 
-# Inventario con IPs reales y usuarios
-inventory/hosts.ini
-
-# Variables con datos sensibles
-group_vars/all.yml
-
 # Claves SSH y certificados
 *.pem
 *.key
